@@ -36,9 +36,7 @@
     "test": "NODE_OPTIONS=--experimental-vm-modules NODE_NO_WARNINGS=1 npx jest",
     "lint": "npx eslint .",
     "format:write": "npx prettier --write .",
-    "format:check": "npx prettier --check .",
-    "changeset": "changeset",
-    "version-packages": "changeset version"
+    "format:check": "npx prettier --check ."
   },
   "peerDependencies": {
     "@actions/core": "^3.0.1",
@@ -47,7 +45,6 @@
   "devDependencies": {
     "@actions/core": "3.0.1",
     "@actions/github": "9.1.1",
-    "@changesets/cli": "2.30.0",
     "@eslint/compat": "2.1.0",
     "@eslint/eslintrc": "3.3.6",
     "@eslint/js": "10.0.1",

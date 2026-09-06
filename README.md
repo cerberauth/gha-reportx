@@ -51,13 +51,22 @@ the schema) into a PR comment.
   request in the payload.
 - `workflowRunUrl(): string` — a link to the current workflow run, used as a
   fallback when the full findings summary doesn't fit in a PR comment.
-- `buildCommentBody(reportJson: string, options: { toolName: string; docsUrl: string }): string`
-  — builds a comment body listing every finding with its severity and URL. Falls
-  back to a per-severity count table plus a link to the workflow run when the
-  full summary would exceed GitHub's comment size limit. `toolName` and
-  `docsUrl` are used in the heading, footer, and to scope the marker used to
+- `buildCommentBody(reportJson: string, options: { toolName: string; docsUrl: string; scanId?: string }): string`
+  — builds a comment body in two parts, mirroring how tools like
+  [super-linter](https://github.com/super-linter/super-linter) format their own
+  summary comment: a visible summary table (one row per finding — vulnerability,
+  endpoint, severity, docs link), or a congrats message when there are none,
+  followed by a hidden `<details>` block carrying every field reportx reports
+  for each finding (description, remediation, CWE, OWASP Top 10, CVSS, ...).
+  Falls back to a per-severity count table plus a link to the workflow run when
+  even the summary table would exceed GitHub's comment size limit. `toolName`
+  and `docsUrl` are used in the heading, footer, and to scope the marker used to
   find/update this comment on future runs (so different tools commenting on the
-  same PR don't clobber each other's comments).
+  same PR don't clobber each other's comments). Pass `scanId` when a single
+  workflow run performs several scans with the same tool on the same PR (e.g.
+  one per matrix target) — it's folded into the marker and heading so each scan
+  gets and keeps its own comment instead of overwriting the others; any string
+  unique per scan works, e.g. the scanned target's URL or the job/matrix label.
 - `postScanComment(token: string, body: string): Promise<void>` — creates or
   updates the PR comment carrying `body` (identified by the marker on its first
   line, as produced by `buildCommentBody`). No-ops outside of pull requests.
@@ -87,7 +96,20 @@ if (isPullRequestEvent()) {
   const body = buildCommentBody(reportJson, {
     toolName: 'my-tool',
     docsUrl: 'https://www.cerberauth.com/docs/my-tool/'
+    // Only needed when a single workflow run scans several targets (e.g. a
+    // matrix build), so each gets its own comment: scanId: getInput('target')
   })
   await postScanComment(getInput('github-token'), body)
 }
 ```
+
+See [examples/post-demo-comments.mjs](examples/post-demo-comments.mjs) for a
+runnable version of the above, wired up in
+[`.github/workflows/example-pr-comment.yml`](.github/workflows/example-pr-comment.yml)
+to post both a with-findings and a no-findings comment on this repo's own pull
+requests.
+
+## License
+
+This repository is licensed under the MIT License @
+[CerberAuth](https://www.cerberauth.com/).

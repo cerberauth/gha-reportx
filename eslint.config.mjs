@@ -49,6 +49,7 @@ export default [
           allowDefaultProject: [
             '__fixtures__/*.ts',
             '__tests__/*.ts',
+            'examples/*.mjs',
             'eslint.config.mjs',
             'jest.config.js'
           ],

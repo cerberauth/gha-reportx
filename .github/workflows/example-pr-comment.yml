@@ -1,0 +1,43 @@
+name: Example PR Comments
+
+# Demonstrates the package end-to-end: builds it, then runs
+# examples/post-demo-comments.mjs, which imports buildCommentBody and
+# postScanComment from dist/index.js to post two separate PR comments — one
+# rendering a report with findings, the other a clean report — so both look
+# can be reviewed straight from the pull request.
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  demo-comments:
+    name: Post Demo Comments
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Post demo PR comments
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node examples/post-demo-comments.mjs

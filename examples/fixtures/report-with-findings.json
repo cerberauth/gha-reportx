@@ -1,0 +1,31 @@
+{
+  "metadata": { "total": 2, "by_severity": { "high": 1, "medium": 1 } },
+  "findings": [
+    {
+      "title": "Missing rate limiting on token endpoint",
+      "severity": "high",
+      "url": "https://example.com/oauth/token",
+      "description": "The token endpoint does not enforce rate limiting, allowing an attacker to brute-force client credentials.",
+      "remediation": "Add rate limiting or account lockout on the token endpoint.",
+      "cwe_id": "CWE-307",
+      "cwe_name": "Improper Restriction of Excessive Authentication Attempts",
+      "owasp_top10": "A07:2021 - Identification and Authentication Failures",
+      "cvss31_score": 7.5,
+      "cvss31_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      "tags": ["oauth", "rate-limiting"]
+    },
+    {
+      "title": "Verbose error messages",
+      "severity": "medium",
+      "url": "https://example.com/oauth/authorize",
+      "description": "Error responses leak internal implementation details that can help an attacker map the authorization server.",
+      "remediation": "Return generic error messages to clients and log details server-side instead.",
+      "cwe_id": "CWE-209",
+      "cwe_name": "Generation of Error Message Containing Sensitive Information",
+      "owasp_top10": "A05:2021 - Security Misconfiguration",
+      "cvss31_score": 5.3,
+      "cvss31_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N",
+      "tags": ["oauth", "information-disclosure"]
+    }
+  ]
+}

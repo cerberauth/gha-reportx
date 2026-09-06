@@ -1,7 +1,7 @@
 {
   "name": "@cerberauth/gha-reportx",
   "description": "Shared reportx CLI flag and PR-comment helpers for CerberAuth's reportx-based GitHub Actions",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "author": "cerberauth",
   "type": "module",
   "license": "MIT",

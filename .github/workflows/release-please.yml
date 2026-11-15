@@ -1,9 +1,9 @@
 name: Release Please
 
-# Releases with release-please, then publishes to npm with trusted publishing
-# (OIDC, no token). npm trusts this workflow file only, so publishing lives here
-# rather than in a reusable workflow. Run it manually to publish the version in
-# package.json again, e.g. after a failed publish.
+# Releases with release-please, then publishes the package to GitHub Packages.
+# Releases created with GITHUB_TOKEN do not trigger other workflows, so
+# publishing runs here. Run it manually to publish the version in package.json
+# again, e.g. after a failed publish.
 on:
   push:
     branches:
@@ -34,7 +34,7 @@ jobs:
           manifest-file: .release-please-manifest.json
 
   publish:
-    name: Publish npm package
+    name: Publish to GitHub Packages
     needs: release-please
     # Runs after release-please creates a release, or on manual dispatch (when
     # release-please is skipped).
@@ -45,19 +45,21 @@ jobs:
 
     permissions:
       contents: read
+      # Provenance statement
       id-token: write
+      packages: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      # Node 24.22.3 ships npm 11.19, above the 11.5.1 trusted publishing needs.
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           cache: npm
-          registry-url: https://registry.npmjs.org
+          registry-url: https://npm.pkg.github.com
+          scope: '@cerberauth'
 
       - name: Install Dependencies
         run: npm ci
@@ -65,7 +67,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Authenticates with the GitHub OIDC token (trusted publishing), which
-      # also signs the provenance statement.
-      - name: Publish @cerberauth/gha-reportx
+      - name: Publish @cerberauth/gha-reportx to GitHub Packages
         run: npm publish --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'

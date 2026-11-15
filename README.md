@@ -8,6 +8,17 @@ aren't reimplemented per repository.
 
 ## Installation
 
+The package is published to GitHub Packages, not npmjs.com. Add an `.npmrc` to
+the action's repository:
+
+```ini
+@cerberauth:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+```
+
+then install it with a token that can read packages (in CI,
+`NODE_AUTH_TOKEN: ${{ github.token }}` with `packages: read` permission):
+
 ```sh
 npm install @cerberauth/gha-reportx
 ```

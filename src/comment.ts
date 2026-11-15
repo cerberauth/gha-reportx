@@ -8,9 +8,20 @@ const MAX_COMMENT_LENGTH = 65536
 // See https://github.com/cerberauth/reportx/blob/main/finding.go
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low', 'info']
 
+// GitHub comments can't color text, so severities get a colored marker.
+const SEVERITY_MARKERS: Record<string, string> = {
+  critical: '🔴',
+  high: '🟠',
+  medium: '🟡',
+  low: '🔵',
+  info: '⚪'
+}
+
 interface ReportxFinding {
   title: string
   severity: string
+  // active, false_positive, accepted_risk or mitigated. Missing means active.
+  status?: string
   url?: string
   description?: string
   remediation?: string
@@ -21,6 +32,8 @@ interface ReportxFinding {
   cvss31_vector?: string
   cvss40_score?: number
   cvss40_vector?: string
+  // Documentation and advisory links; the first one is the finding's docs.
+  references?: string[]
   parameter?: string
   tags?: string[]
 }
@@ -29,6 +42,14 @@ interface ReportxReport {
   metadata: {
     total: number
     by_severity?: Record<string, number>
+    // Scanner version, e.g. "0.11.0".
+    version?: string
+    target?: string
+  }
+  coverage?: {
+    run?: number
+    skipped?: number
+    errored?: number
   }
   findings: ReportxFinding[]
 }
@@ -73,52 +94,109 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
-function severityCounts(report: ReportxReport): [string, number][] {
-  const counts =
-    report.metadata.by_severity ??
-    report.findings.reduce<Record<string, number>>((acc, f) => {
-      acc[f.severity] = (acc[f.severity] ?? 0) + 1
-      return acc
-    }, {})
+// Only active findings need attention. Reports may also carry findings that
+// are mitigated (e.g. a check that ran without finding a vulnerability),
+// accepted risks or false positives.
+function isActive(finding: ReportxFinding): boolean {
+  return (finding.status ?? 'active') === 'active'
+}
+
+// Counted from the findings rather than metadata.by_severity, which also
+// counts findings that are not active.
+function severityCounts(findings: ReportxFinding[]): [string, number][] {
+  const counts = findings.reduce<Record<string, number>>((acc, f) => {
+    acc[f.severity] = (acc[f.severity] ?? 0) + 1
+    return acc
+  }, {})
 
   return SEVERITY_ORDER.filter((severity) => counts[severity]).map(
     (severity): [string, number] => [severity, counts[severity]]
   )
 }
 
-function sortBySeverity(findings: ReportxFinding[]): ReportxFinding[] {
-  return [...findings].sort(
-    (a, b) =>
-      SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity)
-  )
+// Unknown severities sort after the known ones instead of before them.
+function severityRank(severity: string): number {
+  const rank = SEVERITY_ORDER.indexOf(severity)
+  return rank === -1 ? SEVERITY_ORDER.length : rank
+}
+
+// Colored severity label, e.g. "🔴 Critical".
+function severityLabel(severity: string): string {
+  const marker = SEVERITY_MARKERS[severity]
+  return marker ? `${marker} ${capitalize(severity)}` : capitalize(severity)
+}
+
+// The finding's own docs page when reportx has one (references[0], the SARIF
+// rule helpUri), otherwise the tool's docs.
+function docsUrl(
+  finding: ReportxFinding,
+  options: BuildCommentBodyOptions
+): string {
+  return finding.references?.[0] ?? options.docsUrl
+}
+
+// Findings grouped by endpoint (findings without one last), each group sorted
+// by severity, worst first.
+function groupByEndpoint(
+  findings: ReportxFinding[]
+): [string | undefined, ReportxFinding[]][] {
+  const groups = new Map<string | undefined, ReportxFinding[]>()
+  for (const f of findings) {
+    const group = groups.get(f.url) ?? []
+    group.push(f)
+    groups.set(f.url, group)
+  }
+  return [...groups.entries()]
+    .sort(([a], [b]) => {
+      if (a === b) return 0
+      if (a === undefined) return 1
+      if (b === undefined) return -1
+      return a.localeCompare(b)
+    })
+    .map(([endpoint, group]): [string | undefined, ReportxFinding[]] => [
+      endpoint,
+      [...group].sort(
+        (a, b) =>
+          severityRank(a.severity) - severityRank(b.severity) ||
+          a.title.localeCompare(b.title)
+      )
+    ])
+}
+
+// Makes a value safe to put in a Markdown table cell: a `|` would start a new
+// column and a line break would end the row.
+function tableCell(value: string): string {
+  return value.replace(/\r?\n/g, ' ').replace(/\|/g, '\\|')
 }
 
 function congratsMessage(toolName: string): string {
-  return `No ${toolName} findings. Nice work! 🎉`
+  return `✅ No ${toolName} findings. Nice work! 🎉`
 }
 
 // Top-level summary table: one row per finding with just enough to triage
-// (what, where, how bad) plus a docs link, GitHub's collapsed-by-default
-// comment preview. Full detail lives in the `<details>` block below it.
+// (where, how bad, what) plus its docs link, grouped by endpoint and sorted by
+// severity. The endpoint is only shown on the first row of its group. Full
+// detail lives in the `<details>` block below it.
 function renderSummaryTable(
   findings: ReportxFinding[],
   options: BuildCommentBodyOptions
 ): string {
-  const rows = sortBySeverity(findings)
-    .map((f) => {
-      const severity = `\`${capitalize(f.severity)}\``
-      const endpoint = f.url ?? '—'
-      return `| ${f.title} | ${endpoint} | ${severity} | [Docs](${options.docsUrl}) |`
+  const rows = groupByEndpoint(findings).flatMap(([endpoint, group]) =>
+    group.map((f, i) => {
+      const endpointCell = i > 0 ? '' : endpoint ? tableCell(endpoint) : '—'
+      return `| ${endpointCell} | ${severityLabel(f.severity)} | ${tableCell(f.title)} | [Docs](${docsUrl(f, options)}) |`
     })
-    .join('\n')
-  return `| Vulnerability | Endpoint | Severity | Docs |\n| ------------- | -------- | -------- | ---- |\n${rows}`
+  )
+  return `| Endpoint | Severity | Vulnerability | Docs |\n| -------- | -------- | ------------- | ---- |\n${rows.join('\n')}`
 }
 
 // Renders every field reportx reports for a single finding, for the hidden
 // details block. See finding.go for the schema this mirrors.
-function renderFindingDetails(finding: ReportxFinding): string {
-  const meta: string[] = []
-  if (finding.url) meta.push(`- **Endpoint:** ${finding.url}`)
+function renderFindingDetails(
+  finding: ReportxFinding,
+  options: BuildCommentBodyOptions
+): string {
+  const meta: string[] = [`- **Docs:** ${docsUrl(finding, options)}`]
   if (finding.parameter) meta.push(`- **Parameter:** \`${finding.parameter}\``)
   if (finding.cwe_id) {
     meta.push(
@@ -141,13 +219,15 @@ function renderFindingDetails(finding: ReportxFinding): string {
   if (finding.tags?.length) {
     meta.push(`- **Tags:** ${finding.tags.join(', ')}`)
   }
+  const otherReferences = finding.references?.slice(1) ?? []
+  if (otherReferences.length > 0) {
+    meta.push(`- **References:** ${otherReferences.join(', ')}`)
+  }
 
   const sections = [
-    `### ${finding.title} (\`${capitalize(finding.severity)}\`)`
+    `#### ${severityLabel(finding.severity)} — ${finding.title}`,
+    meta.join('\n')
   ]
-  if (meta.length > 0) {
-    sections.push(meta.join('\n'))
-  }
   if (finding.description) {
     sections.push(`**Description**\n\n${finding.description}`)
   }
@@ -157,30 +237,59 @@ function renderFindingDetails(finding: ReportxFinding): string {
   return sections.join('\n\n')
 }
 
-// Hidden `<details>` block carrying the full write-up for every finding, so
-// the visible comment stays scannable while the full report is one click
-// away, right there on the PR.
-function renderFindingsDetails(findings: ReportxFinding[]): string {
-  const sections = sortBySeverity(findings)
-    .map(renderFindingDetails)
-    .join('\n\n---\n\n')
+// Hidden `<details>` block carrying the full write-up for every finding,
+// grouped by endpoint like the summary table, so the visible comment stays
+// scannable while the full report is one click away, right there on the PR.
+function renderFindingsDetails(
+  findings: ReportxFinding[],
+  options: BuildCommentBodyOptions
+): string {
+  const sections = groupByEndpoint(findings)
+    .map(([endpoint, group]) => {
+      const heading = `### ${endpoint ?? 'No endpoint'}`
+      const body = group
+        .map((f) => renderFindingDetails(f, options))
+        .join('\n\n---\n\n')
+      return `${heading}\n\n${body}`
+    })
+    .join('\n\n')
   return `<details>\n\n<summary>Findings details</summary>\n\n${sections}\n\n</details>`
 }
 
-function renderSeverityTable(report: ReportxReport): string {
-  const counts = severityCounts(report)
+function renderSeverityTable(findings: ReportxFinding[]): string {
+  const counts = severityCounts(findings)
   if (counts.length === 0) {
     return 'No findings.'
   }
 
   const rows = counts
-    .map(([severity, count]) => `| ${capitalize(severity)} | ${count} |`)
+    .map(([severity, count]) => `| ${severityLabel(severity)} | ${count} |`)
     .join('\n')
   return `| Severity | Count |\n|----------|-------|\n${rows}`
 }
 
-function footer(options: BuildCommentBodyOptions): string {
-  return `\n\n---\nGenerated by [${options.toolName}](${options.docsUrl}).`
+// Like super-linter's summary comment: which scanner and version produced the
+// report, plus the scan target and how many checks ran.
+function footer(
+  options: BuildCommentBodyOptions,
+  report: ReportxReport
+): string {
+  const lines = [`Powered by [${options.toolName}](${options.docsUrl})`]
+  const { version, target } = report.metadata
+  if (version) {
+    lines.push(`${options.toolName} version: \`${version}\``)
+  }
+  if (target) {
+    lines.push(`Target: \`${target}\``)
+  }
+  const coverage = report.coverage
+  if (coverage) {
+    lines.push(
+      `Checks: ${coverage.run ?? 0} run, ${coverage.skipped ?? 0} skipped, ${coverage.errored ?? 0} errored`
+    )
+  }
+  // A trailing backslash is a Markdown line break, as in super-linter's footer.
+  return `\n\n---\n\n${lines.join('\\\n')}`
 }
 
 // Builds a PR comment body out of a reportx JSON report, in two parts, mirroring
@@ -202,7 +311,13 @@ export function buildCommentBody(
 ): string {
   const report = JSON.parse(reportJson) as ReportxReport
   const marker = commentMarker(options.toolName, options.scanId)
-  const findings = report.findings ?? []
+  const allFindings = report.findings ?? []
+  const findings = allFindings.filter(isActive)
+  const inactiveCount = allFindings.length - findings.length
+  const inactiveNote =
+    inactiveCount === 0
+      ? ''
+      : `\n\n${inactiveCount} other result${inactiveCount === 1 ? ' is' : 's are'} not listed (mitigated, accepted risk or false positive).`
   const heading = options.scanId
     ? `# ${options.toolName} scan results (${options.scanId})`
     : `# ${options.toolName} scan results`
@@ -211,16 +326,26 @@ export function buildCommentBody(
     findings.length === 0
       ? congratsMessage(options.toolName)
       : `${renderSummaryTable(findings, options)}\n\n${options.toolName} detected ${findings.length} finding${findings.length === 1 ? '' : 's'}.`
+  const summaryWithNote = `${summary}${inactiveNote}`
   const details =
-    findings.length === 0 ? '' : `\n\n${renderFindingsDetails(findings)}`
+    findings.length === 0
+      ? ''
+      : `\n\n${renderFindingsDetails(findings, options)}`
 
-  const full = `${marker}\n${heading}\n\n${summary}${footer(options)}${details}`
+  const full = `${marker}\n${heading}\n\n${summaryWithNote}${footer(options, report)}${details}`
   if (full.length <= MAX_COMMENT_LENGTH) {
     return full
   }
 
-  const table = `${heading}\n\n${renderSeverityTable(report)}\n\nThe full findings summary is too large for a PR comment — see the [workflow run](${workflowRunUrl()}) for details.`
-  return `${marker}\n${table}${footer(options)}`
+  // Too large with the details block: keep the summary table and link to the
+  // workflow run for the full write-up.
+  const summaryOnly = `${marker}\n${heading}\n\n${summaryWithNote}\n\nThe findings details are too large for a PR comment — see the [workflow run](${workflowRunUrl()}) for the full report.${footer(options, report)}`
+  if (summaryOnly.length <= MAX_COMMENT_LENGTH) {
+    return summaryOnly
+  }
+
+  const table = `${heading}\n\n${renderSeverityTable(findings)}\n\nThe full findings summary is too large for a PR comment — see the [workflow run](${workflowRunUrl()}) for details.`
+  return `${marker}\n${table}${footer(options, report)}`
 }
 
 // Creates or updates the PR comment carrying the scan results. Any failure
@@ -247,12 +372,15 @@ export async function postScanComment(
   try {
     const octokit = getOctokit(token)
 
-    const comments = await octokit.rest.issues.listComments({
+    // Paginate: the first page only holds 30 comments, so on busy pull
+    // requests the existing comment would be missed and a duplicate posted.
+    const comments = await octokit.paginate(octokit.rest.issues.listComments, {
       owner,
       repo,
-      issue_number
+      issue_number,
+      per_page: 100
     })
-    const existing = comments.data.find((c) => c.body?.startsWith(marker))
+    const existing = comments.find((c) => c.body?.startsWith(marker))
 
     if (existing) {
       await octokit.rest.issues.updateComment({

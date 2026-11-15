@@ -5,7 +5,10 @@
   "author": "cerberauth",
   "type": "module",
   "license": "MIT",
-  "repository": "cerberauth/gha-reportx",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cerberauth/gha-reportx.git"
+  },
   "homepage": "https://github.com/cerberauth/gha-reportx",
   "bugs": {
     "url": "https://github.com/cerberauth/gha-reportx/issues"

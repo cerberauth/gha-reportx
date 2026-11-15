@@ -40,6 +40,12 @@ describe('flags.ts', () => {
       ).toEqual({ path: 'a.json', format: 'json' })
     })
 
+    it('keeps values containing "=" in the flag=value form', () => {
+      expect(
+        parseOutputFlags(['--output=reports/a=b.json', '--output-format=json'])
+      ).toEqual({ path: 'reports/a=b.json', format: 'json' })
+    })
+
     it('returns undefined when absent', () => {
       expect(parseOutputFlags([])).toEqual({
         path: undefined,

@@ -54,25 +54,39 @@ the schema) into a PR comment.
 - `buildCommentBody(reportJson: string, options: { toolName: string; docsUrl: string; scanId?: string }): string`
   — builds a comment body in two parts, mirroring how tools like
   [super-linter](https://github.com/super-linter/super-linter) format their own
-  summary comment: a visible summary table (one row per finding — vulnerability,
-  endpoint, severity, docs link), or a congrats message when there are none,
-  followed by a hidden `<details>` block carrying every field reportx reports
-  for each finding (description, remediation, CWE, OWASP Top 10, CVSS, ...).
-  Falls back to a per-severity count table plus a link to the workflow run when
-  even the summary table would exceed GitHub's comment size limit. `toolName`
-  and `docsUrl` are used in the heading, footer, and to scope the marker used to
-  find/update this comment on future runs (so different tools commenting on the
-  same PR don't clobber each other's comments). Pass `scanId` when a single
-  workflow run performs several scans with the same tool on the same PR (e.g.
-  one per matrix target) — it's folded into the marker and heading so each scan
-  gets and keeps its own comment instead of overwriting the others; any string
-  unique per scan works, e.g. the scanned target's URL or the job/matrix label.
+  summary comment: a visible summary table, or a congrats message when there are
+  none, followed by a hidden `<details>` block carrying every field reportx
+  reports for each finding (description, remediation, CWE, OWASP Top 10, CVSS,
+  references, ...). The table has one row per finding (endpoint, severity,
+  vulnerability, docs link), grouped by endpoint and sorted by severity within
+  each endpoint; the details block uses the same grouping. Severities get a
+  colored marker (🔴 Critical, 🟠 High, 🟡 Medium, 🔵 Low, ⚪ Info), since
+  GitHub comments can't color text. Each finding links to its own docs page
+  (`references[0]`, which reportx also uses as the SARIF rule `helpUri`), or to
+  `docsUrl` when it has none. Like super-linter's comment, the footer shows the
+  scanner version, the scan target and how many checks ran (from the report's
+  `metadata` and `coverage`). When the comment would exceed GitHub's size limit,
+  the details block is dropped in favour of a link to the workflow run; if even
+  the summary table is too large, it falls back to a per-severity count table
+  plus that link. Pipes and line breaks in finding titles and URLs are escaped
+  so they can't break the table. `toolName` and `docsUrl` are used in the
+  heading, footer, and to scope the marker used to find/update this comment on
+  future runs (so different tools commenting on the same PR don't clobber each
+  other's comments). Pass `scanId` when a single workflow run performs several
+  scans with the same tool on the same PR (e.g. one per matrix target) — it's
+  folded into the marker and heading so each scan gets and keeps its own comment
+  instead of overwriting the others; any string unique per scan works, e.g. the
+  scanned target's URL or the job/matrix label. Only `active` findings are
+  listed; mitigated findings, accepted risks and false positives are counted in
+  a note instead.
+
 - `postScanComment(token: string, body: string): Promise<void>` — creates or
   updates the PR comment carrying `body` (identified by the marker on its first
   line, as produced by `buildCommentBody`). No-ops outside of pull requests.
   Logs a warning instead of throwing on failure (e.g. a token without
   `pull-requests: write` on pull requests from forks), since commenting is a
-  best-effort convenience on top of the scan.
+  best-effort convenience on top of the scan. Every page of existing comments is
+  searched, so busy pull requests don't end up with duplicates.
 
 ### Example
 

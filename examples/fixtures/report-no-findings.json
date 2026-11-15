@@ -1,4 +1,15 @@
 {
-  "metadata": { "total": 0, "by_severity": {} },
-  "findings": []
+  "metadata": {
+    "total": 0,
+    "by_severity": {},
+    "tool": "gha-reportx-demo",
+    "version": "1.0.0",
+    "target": "https://example.com"
+  },
+  "findings": [],
+  "coverage": {
+    "run": 12,
+    "skipped": 3,
+    "errored": 0
+  }
 }

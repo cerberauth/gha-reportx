@@ -1,10 +1,11 @@
 name: Publish Package
 
+# Called by the Release Please workflow once a release has been created, or run
+# manually to republish. Releases created with GITHUB_TOKEN do not trigger other
+# workflows, so publishing cannot listen to `release` events.
 on:
-  workflow_run:
-    workflows: [Release Please]
-    types: [completed]
-  workflow_dispatch:
+  workflow_call: {}
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -13,9 +14,6 @@ jobs:
   publish:
     name: Publish npm package
     runs-on: ubuntu-latest
-    if:
-      ${{ github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success' }}
 
     permissions:
       contents: read

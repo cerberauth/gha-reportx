@@ -1,5 +1,16 @@
 {
-  "metadata": { "total": 2, "by_severity": { "high": 1, "medium": 1 } },
+  "metadata": {
+    "total": 5,
+    "by_severity": {
+      "high": 1,
+      "medium": 2,
+      "low": 1,
+      "critical": 1
+    },
+    "tool": "gha-reportx-demo",
+    "version": "1.0.0",
+    "target": "https://example.com"
+  },
   "findings": [
     {
       "title": "Missing rate limiting on token endpoint",
@@ -12,7 +23,9 @@
       "owasp_top10": "A07:2021 - Identification and Authentication Failures",
       "cvss31_score": 7.5,
       "cvss31_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
-      "tags": ["oauth", "rate-limiting"]
+      "tags": ["oauth", "rate-limiting"],
+      "status": "active",
+      "references": ["https://www.cerberauth.com/docs/vulnapi/vulnerabilities/"]
     },
     {
       "title": "Verbose error messages",
@@ -25,7 +38,46 @@
       "owasp_top10": "A05:2021 - Security Misconfiguration",
       "cvss31_score": 5.3,
       "cvss31_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N",
-      "tags": ["oauth", "information-disclosure"]
+      "tags": ["oauth", "information-disclosure"],
+      "status": "active",
+      "references": ["https://cwe.mitre.org/data/definitions/209.html"]
+    },
+    {
+      "title": "Open redirect via redirect_uri | state",
+      "severity": "low",
+      "url": "https://example.com/oauth/callback?redirect_uri=a|b",
+      "description": "The `redirect_uri` parameter accepts arbitrary hosts. The `|` in this finding's title and URL checks that the summary table escapes pipes.",
+      "remediation": "Validate `redirect_uri` against an exact allowlist of registered URIs.",
+      "cwe_id": "CWE-601",
+      "cwe_name": "URL Redirection to Untrusted Site ('Open Redirect')",
+      "tags": ["oauth"],
+      "status": "active",
+      "references": [
+        "https://cwe.mitre.org/data/definitions/601.html",
+        "https://owasp.org/www-community/attacks/Unvalidated_Redirects_and_Forwards"
+      ]
+    },
+    {
+      "title": "Algorithm None",
+      "severity": "critical",
+      "status": "mitigated",
+      "url": "https://example.com/oauth/token",
+      "description": "The check ran and the server rejected unsigned tokens, so it is not listed in the summary table."
+    },
+    {
+      "title": "Token endpoint accepts HTTP",
+      "severity": "medium",
+      "status": "active",
+      "url": "https://example.com/oauth/token",
+      "description": "The token endpoint also answers over plain HTTP, exposing credentials in transit.",
+      "remediation": "Serve the endpoint over HTTPS only and enable HSTS.",
+      "cwe_id": "CWE-319",
+      "references": ["https://cwe.mitre.org/data/definitions/319.html"]
     }
-  ]
+  ],
+  "coverage": {
+    "run": 12,
+    "skipped": 3,
+    "errored": 0
+  }
 }

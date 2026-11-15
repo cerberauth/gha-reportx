@@ -25,7 +25,8 @@ export function hasFlag(args: string[], flag: string): boolean {
 function getFlagValue(args: string[], flag: string): string | undefined {
   for (let i = 0; i < args.length; i++) {
     if (args[i] === flag) return args[i + 1]
-    if (args[i].startsWith(`${flag}=`)) return args[i].split('=')[1]
+    // Keep everything after the first `=`: values may contain `=` themselves.
+    if (args[i].startsWith(`${flag}=`)) return args[i].slice(flag.length + 1)
   }
   return undefined
 }

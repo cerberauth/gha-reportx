@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.1](https://github.com/cerberauth/gha-reportx/compare/v1.0.0...v1.0.1) (2026-11-15)
+
+
+### Bug Fixes
+
+* publish the package with public access ([17e1744](https://github.com/cerberauth/gha-reportx/commit/17e174435be03cc401b13420cceef9ed41eb6f34))
+* publish the package with public access ([5314718](https://github.com/cerberauth/gha-reportx/commit/53147186ac3d218a1bf8fb5817bcc50403afb82d))
+
 ## 1.0.0 (2026-11-15)
 
 
